@@ -11,7 +11,7 @@ global server
 server = None
 
 def graceful_shutdown(signum=None, frame=None):
-   if server is not None:
+    if server is not None:
         server.shutdown()
     sys.exit(0)
 
