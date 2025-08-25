@@ -10,7 +10,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG
-      - CLIENTS={clients}
     networks:
       - testing_net
 """
