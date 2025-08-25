@@ -14,9 +14,17 @@ class Server:
     def graceful_shutdown(self, signum=None, frame=None):
         self.running = False
         if self._server_socket:
-            self._server_socket.close()
+            try:
+                self._server_socket.close()
+                logging.info('action: close_fd | target: server_socket | result: success')
+            except OSError as e:
+                logging.error(f'action: close_fd | target: server_socket | result: fail | error: {e}')
         for client_socket in self.client_sockets:
-            client_socket.close()
+            try:
+                client_socket.close()
+                logging.info(f'action: close_fd | target: client_socket | result: success')
+            except OSError as e:
+                logging.error(f'action: close_fd | target: client_socket | result: fail | error: {e}')
         logging.info(f'action: shutdown | result: success')
 
     def run(self):
@@ -36,9 +44,10 @@ class Server:
                 if client_sock:
                     self.client_sockets.append(client_sock)
                     self.__handle_client_connection(client_sock)
-            except:
+            except OSError as e:
                 if not self.running:
                     break
+                logging.error(f'action: accept_error | error: {e}')
 
     def __handle_client_connection(self, client_sock):
         """
@@ -58,7 +67,10 @@ class Server:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
             client_sock.close()
-            self.client_sockets.remove(client_sock)
+            try:
+                self.client_sockets.remove(client_sock)
+            except ValueError:
+                pass
 
     def __accept_new_connection(self):
         """
