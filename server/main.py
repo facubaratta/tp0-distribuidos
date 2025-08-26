@@ -12,7 +12,7 @@ server = None
 
 def graceful_shutdown(signum=None, frame=None):
     if server is not None:
-        server.shutdown()
+        server.graceful_shutdown()
     sys.exit(0)
 
 
