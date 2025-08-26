@@ -36,8 +36,6 @@ class Server:
         finishes, servers starts to accept new connections again
         """
 
-        signal.signal(signal.SIGTERM, self.graceful_shutdown)
-
         while self.running:
             try:
                 client_sock = self.__accept_new_connection()
