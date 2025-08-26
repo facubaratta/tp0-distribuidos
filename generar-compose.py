@@ -23,6 +23,11 @@ services:
     entrypoint: /client
     environment:
       - CLI_ID={i}
+      - NOMBRE=RANDOM
+      - APELLIDO=RANDOM
+      - DOCUMENTO=12345678
+      - FECHA_NACIMIENTO=2000-01-01
+      - NUMERO=12345678
     networks:
       - testing_net
     volumes:
