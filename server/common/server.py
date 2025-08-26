@@ -1,10 +1,11 @@
 import socket
 import logging
 
+from common.transfer import read_bet, send_ack, ProtocolError
+from common.utils import store_bets
 
 class Server:
     def __init__(self, port, listen_backlog):
-        # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
@@ -19,23 +20,15 @@ class Server:
                 logging.info('action: close_fd | target: server_socket | result: success')
             except OSError as e:
                 logging.error(f'action: close_fd | target: server_socket | result: fail | error: {e}')
-        for client_socket in self.client_sockets:
+        for cs in list(self.client_sockets):
             try:
-                client_socket.close()
-                logging.info(f'action: close_fd | target: client_socket | result: success')
+                cs.close()
+                logging.info('action: close_fd | target: client_socket | result: success')
             except OSError as e:
                 logging.error(f'action: close_fd | target: client_socket | result: fail | error: {e}')
-        logging.info(f'action: shutdown | result: success')
+        logging.info('action: shutdown | result: success')
 
     def run(self):
-        """
-        Dummy Server loop
-
-        Server that accept a new connections and establishes a
-        communication with a client. After client with communucation
-        finishes, servers starts to accept new connections again
-        """
-
         while self.running:
             try:
                 client_sock = self.__accept_new_connection()
@@ -48,38 +41,31 @@ class Server:
                 logging.error(f'action: accept_error | error: {e}')
 
     def __handle_client_connection(self, client_sock):
-        """
-        Read message from a specific client socket and closes the socket
-
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
-        """
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
-            # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
-        except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
-        finally:
-            client_sock.close()
+            bet = read_bet(client_sock)
+            store_bets([bet])
+            logging.info(
+                'action: apuesta_almacenada | result: success | dni: %s | numero: %d',
+                bet.document, bet.number
+            )
+            send_ack(client_sock, ok=True)
+        except (ProtocolError, OSError, ValueError) as e:
+            logging.error('action: handle_client | result: fail | error: %s', e)
             try:
-                self.client_sockets.remove(client_sock)
-            except ValueError:
+                send_ack(client_sock, ok=False, error=str(e))
+            except Exception:
                 pass
+        finally:
+            try:
+                client_sock.close()
+            finally:
+                try:
+                    self.client_sockets.remove(client_sock)
+                except ValueError:
+                    pass
 
     def __accept_new_connection(self):
-        """
-        Accept new connections
-
-        Function blocks until a connection to a client is made.
-        Then connection created is printed and returned
-        """
-
-        # Connection arrived
         logging.info('action: accept_connections | result: in_progress')
         c, addr = self._server_socket.accept()
-        logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
+        logging.info('action: accept_connections | result: success | ip: %s', addr[0])
         return c
