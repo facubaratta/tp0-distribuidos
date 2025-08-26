@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"time"
+	"os/signal"
+    "syscall"
 
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
