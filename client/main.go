@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
-	"time"
 	"os/signal"
-    "syscall"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
@@ -115,6 +115,13 @@ func main() {
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, syscall.SIGTERM)
 
+	id := v.GetString("id")
+	bet, err := common.LoadBetFromEnv(id)
+	if err != nil {
+		log.Criticalf("action: config | result: fail | client_id: %v | error: %v", id, err)
+		return
+	}
+
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop(signalChannel)
+	client.StartClientLoop(signalChannel, bet)
 }
