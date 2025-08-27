@@ -1,7 +1,7 @@
 import socket
 import logging
 
-from common.transfer import read_bet, send_ack, ProtocolError
+from common.transfer import read_batch, read_bet, send_ack, ProtocolError
 from common.utils import store_bets
 
 class Server:
@@ -42,12 +42,9 @@ class Server:
 
     def __handle_client_connection(self, client_sock):
         try:
-            bet = read_bet(client_sock)
-            store_bets([bet])
-            logging.info(
-                'action: apuesta_almacenada | result: success | dni: %s | numero: %d',
-                bet.document, bet.number
-            )
+            bets = read_batch(client_sock)
+            store_bets(bets)
+            logging.info("action: apuesta_recibida | result: success | cantidad: %d", len(bets))
             send_ack(client_sock, ok=True)
         except (ProtocolError, OSError, ValueError) as e:
             logging.error('action: handle_client | result: fail | error: %s', e)
