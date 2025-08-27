@@ -64,7 +64,7 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, bet *Bet) {
 			return
 		}
 
-		log.Infof("action: apuesta_enviada | result: success | dni: %s | numero: %d", bet.Document, bet.Number)
+		log.Infof("action: apuesta_enviada | result: success | dni: %s | numero: %s", bet.Document, bet.Number)
 
 		select {
 		case <-sigChan:
