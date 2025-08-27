@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -92,6 +94,40 @@ func PrintConfig(v *viper.Viper) {
 	)
 }
 
+func loadBetsFromCSV(agencyID string, dir string) ([]*common.Bet, error) {
+	path := filepath.Join(dir, "agency-"+agencyID+".csv")
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	var bets []*common.Bet
+	for {
+		rec, err := r.Read()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return nil, err
+		}
+		if len(rec) < 5 {
+			continue
+		}
+
+		bets = append(bets, &common.Bet{
+			Agency:    agencyID,
+			FirstName: rec[0],
+			LastName:  rec[1],
+			Document:  rec[2],
+			Birthdate: rec[3],
+			Number:    rec[4],
+		})
+	}
+	return bets, nil
+}
+
 func main() {
 	v, err := InitConfig()
 	if err != nil {
@@ -112,16 +148,24 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	signalChannel := make(chan os.Signal, 1)
-	signal.Notify(signalChannel, syscall.SIGTERM)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM)
 
 	id := v.GetString("id")
-	bet, err := common.LoadBetFromEnv(id)
+
+	batchMax := v.GetInt("batch.maxAmount")
+
+	dataDir := v.GetString("data.dir")
+	if dataDir == "" {
+		dataDir = "/data"
+	}
+
+	allBets, err := loadBetsFromCSV(id, dataDir)
 	if err != nil {
-		log.Criticalf("action: config | result: fail | client_id: %v | error: %v", id, err)
+		log.Errorf("action: load_bets | result: fail | client_id: %v | error: %v", id, err)
 		return
 	}
 
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop(signalChannel, bet)
+	client.StartClientLoop(sigChan, allBets, batchMax, 8192)
 }

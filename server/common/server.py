@@ -1,7 +1,7 @@
 import socket
 import logging
 
-from common.transfer import read_batch, read_bet, send_ack, ProtocolError
+from common.transfer import read_batch, send_ack
 from common.utils import store_bets
 
 class Server:
@@ -40,16 +40,23 @@ class Server:
                     break
                 logging.error(f'action: accept_error | error: {e}')
 
-    def __handle_client_connection(self, client_sock):
+    def __handle_client_connection(self, client_sock: socket.socket):
         try:
+            # Read a whole BCH0 batch
             bets = read_batch(client_sock)
+
+            # Persist all bets
             store_bets(bets)
+
+            # Log and ACK for the whole batch
             logging.info("action: apuesta_recibida | result: success | cantidad: %d", len(bets))
-            send_ack(client_sock, ok=True)
-        except (ProtocolError, OSError, ValueError) as e:
-            logging.error('action: handle_client | result: fail | error: %s', e)
+            send_ack(client_sock, ok=True, count=len(bets))
+
+        except Exception as e:
+            logging.error('action: apuesta_recibida | result: fail | error: %s', e)
+            # Single ACK for the whole batch, failure
             try:
-                send_ack(client_sock, ok=False, error=str(e))
+                send_ack(client_sock, ok=False, count=0)
             except Exception:
                 pass
         finally:

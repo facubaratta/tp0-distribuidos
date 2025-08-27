@@ -3,11 +3,25 @@ package common
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"net"
+	"strconv"
 )
+
+const (
+	magicBET0 = "BET0"
+	magicBCH0 = "BCH0"
+	magicACK0 = "ACK0"
+)
+
+func atoiSafe(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return n
+}
 
 func writeFrame(conn net.Conn, payload []byte) error {
 	var hdr [4]byte
@@ -19,9 +33,9 @@ func writeFrame(conn net.Conn, payload []byte) error {
 	return err
 }
 
-func readN(conn net.Conn, n int) ([]byte, error) {
+func readN(r io.Reader, n int) ([]byte, error) {
 	buf := make([]byte, n)
-	_, err := io.ReadFull(conn, buf)
+	_, err := io.ReadFull(r, buf)
 	return buf, err
 }
 
@@ -30,50 +44,79 @@ func readFrame(conn net.Conn) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	length := binary.BigEndian.Uint32(hdr)
-	if length == 0 {
+	l := binary.BigEndian.Uint32(hdr)
+	if l == 0 {
 		return []byte{}, nil
 	}
-	return readN(conn, int(length))
+	return readN(conn, int(l))
 }
 
-func writeJSON(conn net.Conn, v interface{}) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	return writeFrame(conn, b)
+// ---------- helpers ----------
+func encodeString(b *bytes.Buffer, s string) {
+	_ = binary.Write(b, binary.BigEndian, uint16(len(s)))
+	_, _ = b.WriteString(s)
 }
 
-func readJSON(conn net.Conn, v interface{}) error {
-	b, err := readFrame(conn)
-	if err != nil {
-		return err
-	}
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
-	return dec.Decode(v)
+func encodeBetFields(b *bytes.Buffer, bet *Bet) {
+	_ = binary.Write(b, binary.BigEndian, int32(atoiSafe(bet.Agency)))
+	encodeString(b, bet.FirstName)
+	encodeString(b, bet.LastName)
+	encodeString(b, bet.Document)
+	encodeString(b, bet.Birthdate)
+	_ = binary.Write(b, binary.BigEndian, int32(atoiSafe(bet.Number)))
 }
 
-type ackWire struct {
-	Ok    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
-}
-
+// ---------- batch ----------
 func SendBatch(conn net.Conn, bets []*Bet) error {
-	return writeJSON(conn, bets)
+	var p bytes.Buffer
+	p.WriteString(magicBCH0)
+	n := uint16(len(bets))
+	_ = binary.Write(&p, binary.BigEndian, n)
+	for _, bet := range bets {
+		encodeBetFields(&p, bet)
+	}
+	return writeFrame(conn, p.Bytes())
 }
 
-func ReadAck(conn net.Conn) (ok bool, errMsg string, err error) {
-	var ack ackWire
-	if err = readJSON(conn, &ack); err != nil {
-		return false, "", err
+func ReadAck(conn net.Conn) (ok bool, count uint16, err error) {
+	f, e := readFrame(conn)
+	if e != nil {
+		return false, 0, e
 	}
-	if !ack.Ok {
-		if ack.Error != "" {
-			return false, ack.Error, fmt.Errorf("server error: %s", ack.Error)
-		}
-		return false, "", fmt.Errorf("server returned ok=false")
+	if len(f) < 4+1+2 || string(f[:4]) != magicACK0 {
+		return false, 0, errors.New("bad ACK0")
 	}
-	return true, "", nil
+	pos := 4
+	ok = f[pos] == 1
+	pos++
+	count = binary.BigEndian.Uint16(f[pos : pos+2])
+	return ok, count, nil
+}
+
+func betPayloadSize(b *Bet) int {
+	// agency(int32) + number(int32)
+	const fixedInts = 4 + 4
+
+	// Each string is encoded as: uint16 length + raw bytes
+	strFieldSize := func(s string) int { return 2 + len(s) }
+
+	return fixedInts +
+		strFieldSize(b.FirstName) +
+		strFieldSize(b.LastName) +
+		strFieldSize(b.Document) +
+		strFieldSize(b.Birthdate)
+}
+
+func FrameSizeForBatch(bets []*Bet) int {
+	const (
+		frameLen = 4
+		// payload fixed header: "BCH0"(4) + count(uint16)(2)
+		payloadHeader = 4 + 2
+	)
+
+	size := frameLen + payloadHeader
+	for _, b := range bets {
+		size += betPayloadSize(b)
+	}
+	return size
 }

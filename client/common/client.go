@@ -36,10 +36,8 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop envía la misma apuesta en loop, solo para mantener
-// la estructura del TP; en un caso real sería una por proceso/cliente.
-func (c *Client) StartClientLoop(sigChan chan os.Signal, bet *Bet) {
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
+func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMax int, maxBytes int) {
+	for i := 0; i < len(allBets); {
 		select {
 		case <-sigChan:
 			log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
@@ -47,24 +45,40 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, bet *Bet) {
 		default:
 		}
 
+		j := i + batchMax
+		if j > len(allBets) {
+			j = len(allBets)
+		}
+
+		batch := allBets[i:j]
+
+		for FrameSizeForBatch(batch) > maxBytes && len(batch) > 0 {
+			batch = batch[:len(batch)-1]
+		}
+
+		if len(batch) == 0 {
+			log.Warning("Bet too large to fit in maxBytes, skipping")
+			i++
+			continue
+		}
+
 		if err := c.createClientSocket(); err != nil {
 			return
 		}
 
-		if err := SendBet(c.conn, bet); err != nil {
+		if err := SendBatch(c.conn, batch); err != nil {
 			_ = c.conn.Close()
-			log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v", c.config.ID, err)
 			return
 		}
-
-		ok, srvErr, err := ReadAck(c.conn)
+		ok, count, err := ReadAck(c.conn)
 		_ = c.conn.Close()
-		if err != nil || !ok {
-			log.Errorf("action: receive_ack | result: fail | client_id: %v | error: %v %s", c.config.ID, err, srvErr)
+		if err != nil || !ok || int(count) != len(batch) {
+			log.Errorf("action: receive_ack | result: fail | client_id: %v | error: %v | expected: %d got: %d", c.config.ID, err, len(batch), count)
 			return
 		}
 
-		log.Infof("action: apuesta_enviada | result: success | dni: %s | numero: %s", bet.Document, bet.Number)
+		i += len(batch)
 
 		select {
 		case <-sigChan:
@@ -73,5 +87,5 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, bet *Bet) {
 		case <-time.After(c.config.LoopPeriod):
 		}
 	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	log.Infof("action: batches_done | result: success | client_id: %v", c.config.ID)
 }
