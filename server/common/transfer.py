@@ -1,5 +1,6 @@
 import struct
 import socket
+from typing import Optional
 
 # utils.Bet(agency, first_name, last_name, document, birthdate, number)
 from common.utils import Bet
@@ -96,7 +97,7 @@ def read_bet(sock: socket.socket) -> Bet:
         str(number_u32),
     )
 
-def send_ack(sock: socket.socket, ok: bool = True, error: str | None = None):
+def send_ack(sock: socket.socket, ok: bool = True, error: Optional[str] = None):
     parts: list[bytes] = []
     parts.append(MAGIC_ACK)
     parts.append(b"\x01" if ok else b"\x00")
