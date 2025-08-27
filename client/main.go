@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -32,12 +31,9 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "amount")
 	v.BindEnv("log", "level")
 
-	v.BindEnv("data", "dir")        // CLI_DATA_DIR
 	v.BindEnv("batch", "maxAmount") // CLI_BATCH_MAXAMOUNT
 	v.BindEnv("batch", "maxBytes")  // CLI_BATCH_MAXBYTES
 
-	// Defaults
-	v.SetDefault("data.dir", "/data")
 	v.SetDefault("batch.maxAmount", 50)
 	v.SetDefault("batch.maxBytes", 8*1024) // 8KB por consigna
 
@@ -96,10 +92,8 @@ func main() {
 	id := v.GetString("id")
 	batchMax := v.GetInt("batch.maxAmount")
 	maxBytes := v.GetInt("batch.maxBytes")
-	dataDir := v.GetString("data.dir")
 
-	csvPath := filepath.Join(dataDir, "agency.csv")
-	allBets, err := common.LoadBetsFromCSV(csvPath, id)
+	allBets, err := common.LoadBetsFromCSV("agency.csv", id)
 	if err != nil {
 		log.Criticalf("action: load_bets | result: fail | client_id: %v | error: %v", id, err)
 		return
