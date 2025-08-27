@@ -88,5 +88,5 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 		case <-time.After(c.config.LoopPeriod):
 		}
 	}
-	log.Infof("action: batches_done | result: success | client_id: %v", c.config.ID)
+	log.Debugf("action: batches_done | result: success | client_id: %v", c.config.ID)
 }
