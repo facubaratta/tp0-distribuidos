@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -33,8 +32,7 @@ func betFromCSVRow(agencyID string, row []string) (*Bet, error) {
 	}, nil
 }
 
-func LoadBetsFromCSV(dataDir string, agencyID string) ([]*Bet, error) {
-	path := filepath.Join(dataDir, "agency-"+agencyID+".csv")
+func LoadBetsFromCSV(path string, agencyID string) ([]*Bet, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("no se pudo abrir %s: %w", path, err)

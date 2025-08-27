@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -97,7 +98,8 @@ func main() {
 	maxBytes := v.GetInt("batch.maxBytes")
 	dataDir := v.GetString("data.dir")
 
-	allBets, err := common.LoadBetsFromCSV(dataDir, id)
+	csvPath := filepath.Join(dataDir, "agency.csv")
+	allBets, err := common.LoadBetsFromCSV(csvPath, id)
 	if err != nil {
 		log.Criticalf("action: load_bets | result: fail | client_id: %v | error: %v", id, err)
 		return
