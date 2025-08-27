@@ -104,6 +104,7 @@ func main() {
 		log.Criticalf("action: load_bets | result: fail | client_id: %v | error: %v", id, err)
 		return
 	}
+	log.Infof("action: bets_loaded | result: success | client_id: %s | count: %d", id, len(allBets))
 
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
