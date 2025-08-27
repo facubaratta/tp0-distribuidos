@@ -53,14 +53,14 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 
 		batch := allBets[i:j]
 
-		// for len(batch) > 1 && BatchFrameSize(batch) > maxBytes {
-		// 	batch = batch[:len(batch)-1]
-		// }
+		for len(batch) > 1 && BatchFrameSize(batch) > maxBytes {
+			batch = batch[:len(batch)-1]
+		}
 
-		// if len(batch) == 1 && BatchFrameSize(batch) > maxBytes {
-		// 	log.Criticalf("single bet exceeds maxBytes (%d)", maxBytes)
-		// 	return
-		// }
+		if len(batch) == 1 && BatchFrameSize(batch) > maxBytes {
+			log.Criticalf("single bet exceeds maxBytes (%d)", maxBytes)
+			return
+		}
 
 		if err := c.createClientSocket(); err != nil {
 			return
