@@ -59,5 +59,5 @@ from typing import Optional, Dict, Union
 def send_ack(sock: socket.socket, ok: bool = True, error: Optional[str] = None):
     msg: Dict[str, Union[bool, str]] = {"ok": bool(ok)}
     if not ok and error:
-        msg["error_message"] = str(error)
+        msg["error"] = str(error)
     write_json(sock, msg)
