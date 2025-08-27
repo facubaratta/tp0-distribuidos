@@ -23,15 +23,11 @@ services:
     entrypoint: /client
     environment:
       - CLI_ID={i}
-      - NOMBRE=RANDOM
-      - APELLIDO=RANDOM
-      - DOCUMENTO=12345678
-      - NACIMIENTO=2000-01-01
-      - NUMERO=12345678
     networks:
       - testing_net
     volumes:
       - ./client/config.yaml:/config.yaml
+      - ./.data/agency-{i}.csv:/data/agency.csv:ro
     depends_on:
       - server
 """

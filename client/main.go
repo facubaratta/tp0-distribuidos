@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/csv"
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -19,39 +17,35 @@ import (
 
 var log = logging.MustGetLogger("log")
 
-// InitConfig Function that uses viper library to parse configuration parameters.
-// Viper is configured to read variables from both environment variables and the
-// config file ./config.yaml. Environment variables takes precedence over parameters
-// defined in the configuration file. If some of the variables cannot be parsed,
-// an error is returned
+// InitConfig: lee config.yaml y variables de entorno (CLI_*).
 func InitConfig() (*viper.Viper, error) {
 	v := viper.New()
 
-	// Configure viper to read env variables with the CLI_ prefix
 	v.AutomaticEnv()
 	v.SetEnvPrefix("cli")
-	// Use a replacer to replace env variables underscores with points. This let us
-	// use nested configurations in the config file and at the same time define
-	// env variables for the nested configurations
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Add env variables supported
+	// Claves existentes
 	v.BindEnv("id")
 	v.BindEnv("server", "address")
 	v.BindEnv("loop", "period")
 	v.BindEnv("loop", "amount")
 	v.BindEnv("log", "level")
 
-	// Try to read configuration from config file. If config file
-	// does not exists then ReadInConfig will fail but configuration
-	// can be loaded from the environment variables so we shouldn't
-	// return an error in that case
+	// NUEVO: claves para batches y datos
+	v.BindEnv("data", "dir")        // CLI_DATA_DIR
+	v.BindEnv("batch", "maxAmount") // CLI_BATCH_MAXAMOUNT
+	v.BindEnv("batch", "maxBytes")  // CLI_BATCH_MAXBYTES
+
+	// Defaults
+	v.SetDefault("data.dir", "/data")
+	v.SetDefault("batch.maxAmount", 50)
+	v.SetDefault("batch.maxBytes", 8*1024) // 8KB por consigna
+
 	v.SetConfigFile("./config.yaml")
 	if err := v.ReadInConfig(); err != nil {
 		fmt.Printf("Configuration could not be read from config file. Using env variables instead")
 	}
-
-	// Parse time.Duration variables and return an error if those variables cannot be parsed
 
 	if _, err := time.ParseDuration(v.GetString("loop.period")); err != nil {
 		return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
@@ -60,72 +54,32 @@ func InitConfig() (*viper.Viper, error) {
 	return v, nil
 }
 
-// InitLogger Receives the log level to be set in go-logging as a string. This method
-// parses the string and set the level to the logger. If the level string is not
-// valid an error is returned
 func InitLogger(logLevel string) error {
 	baseBackend := logging.NewLogBackend(os.Stdout, "", 0)
-	format := logging.MustStringFormatter(
-		`%{time:2006-01-02 15:04:05} %{level:.5s}     %{message}`,
-	)
+	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05} %{level:.5s}     %{message}`)
 	backendFormatter := logging.NewBackendFormatter(baseBackend, format)
-
 	backendLeveled := logging.AddModuleLevel(backendFormatter)
 	logLevelCode, err := logging.LogLevel(logLevel)
 	if err != nil {
 		return err
 	}
 	backendLeveled.SetLevel(logLevelCode, "")
-
-	// Set the backends to be used.
 	logging.SetBackend(backendLeveled)
 	return nil
 }
 
-// PrintConfig Print all the configuration parameters of the program.
-// For debugging purposes only
 func PrintConfig(v *viper.Viper) {
-	log.Infof("action: config | result: success | client_id: %s | server_address: %s | loop_amount: %v | loop_period: %v | log_level: %s",
+	log.Infof(
+		"action: config | result: success | client_id: %s | server_address: %s | loop_amount: %v | loop_period: %v | log_level: %s | data_dir: %s | batch_max_amount: %d | batch_max_bytes: %d",
 		v.GetString("id"),
 		v.GetString("server.address"),
 		v.GetInt("loop.amount"),
 		v.GetDuration("loop.period"),
 		v.GetString("log.level"),
+		v.GetString("data.dir"),
+		v.GetInt("batch.maxAmount"),
+		v.GetInt("batch.maxBytes"),
 	)
-}
-
-func loadBetsFromCSV(agencyID string, dir string) ([]*common.Bet, error) {
-	path := filepath.Join(dir, "agency-"+agencyID+".csv")
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	r := csv.NewReader(f)
-	var bets []*common.Bet
-	for {
-		rec, err := r.Read()
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			return nil, err
-		}
-		if len(rec) < 5 {
-			continue
-		}
-
-		bets = append(bets, &common.Bet{
-			Agency:    agencyID,
-			FirstName: rec[0],
-			LastName:  rec[1],
-			Document:  rec[2],
-			Birthdate: rec[3],
-			Number:    rec[4],
-		})
-	}
-	return bets, nil
 }
 
 func main() {
@@ -138,12 +92,22 @@ func main() {
 		log.Criticalf("%s", err)
 	}
 
-	// Print program config with debugging purposes
 	PrintConfig(v)
+
+	id := v.GetString("id")
+	batchMax := v.GetInt("batch.maxAmount")
+	maxBytes := v.GetInt("batch.maxBytes")
+	dataDir := v.GetString("data.dir")
+
+	allBets, err := common.LoadBetsFromCSV(dataDir, id)
+	if err != nil {
+		log.Criticalf("action: load_bets | result: fail | client_id: %v | error: %v", id, err)
+		return
+	}
 
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
+		ID:            id,
 		LoopAmount:    v.GetInt("loop.amount"),
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
@@ -151,21 +115,7 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM)
 
-	id := v.GetString("id")
-
-	batchMax := v.GetInt("batch.maxAmount")
-
-	dataDir := v.GetString("data.dir")
-	if dataDir == "" {
-		dataDir = "/data"
-	}
-
-	allBets, err := loadBetsFromCSV(id, dataDir)
-	if err != nil {
-		log.Errorf("action: load_bets | result: fail | client_id: %v | error: %v", id, err)
-		return
-	}
-
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop(sigChan, allBets, batchMax, 8192)
+	// Enviamos usando batches y límite de bytes configurado
+	client.StartClientLoop(sigChan, allBets, batchMax, maxBytes)
 }
