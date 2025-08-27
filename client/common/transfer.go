@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	magicBET0 = "BET0"
 	magicBCH0 = "BCH0"
 	magicACK0 = "ACK0"
 )
