@@ -57,8 +57,6 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, bet *Bet) {
 			return
 		}
 
-		log.Infof("action: send_bet | result: waiting | client_id: %v", c.config.ID)
-
 		ok, srvErr, err := ReadAck(c.conn)
 		_ = c.conn.Close()
 		if err != nil || !ok {

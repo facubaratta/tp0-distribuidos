@@ -9,8 +9,6 @@ import (
 	"net"
 )
 
-// ----- framing: 4 bytes BE length + payload -----
-
 func writeFrame(conn net.Conn, payload []byte) error {
 	var hdr [4]byte
 	binary.BigEndian.PutUint32(hdr[:], uint32(len(payload)))
@@ -23,7 +21,7 @@ func writeFrame(conn net.Conn, payload []byte) error {
 
 func readN(conn net.Conn, n int) ([]byte, error) {
 	buf := make([]byte, n)
-	_, err := io.ReadFull(conn, buf) // short-read safe
+	_, err := io.ReadFull(conn, buf)
 	return buf, err
 }
 
@@ -39,9 +37,7 @@ func readFrame(conn net.Conn) ([]byte, error) {
 	return readN(conn, int(length))
 }
 
-// ----- JSON helpers -----
-
-func writeJSON(conn net.Conn, v any) error {
+func writeJSON(conn net.Conn, v interface{}) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -49,7 +45,7 @@ func writeJSON(conn net.Conn, v any) error {
 	return writeFrame(conn, b)
 }
 
-func readJSON(conn net.Conn, v any) error {
+func readJSON(conn net.Conn, v interface{}) error {
 	b, err := readFrame(conn)
 	if err != nil {
 		return err
@@ -59,21 +55,13 @@ func readJSON(conn net.Conn, v any) error {
 	return dec.Decode(v)
 }
 
-// ----- Wire types -----
-
 type ackWire struct {
 	Ok    bool   `json:"ok"`
 	Error string `json:"error,omitempty"`
 }
 
-// Bet ya lo tenés en domain.go con tags json:
-//   Agency, FirstName, LastName, Document, Birthdate, Number
-//   y los tags `json:"agency"` etc.
-
-// ----- API pública -----
-
 func SendBet(conn net.Conn, bet *Bet) error {
-	return writeJSON(conn, bet) // las claves ya matchean el server
+	return writeJSON(conn, bet)
 }
 
 func ReadAck(conn net.Conn) (bool, string, error) {
