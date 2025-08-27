@@ -60,13 +60,13 @@ type ackWire struct {
 	Error string `json:"error,omitempty"`
 }
 
-func SendBet(conn net.Conn, bet *Bet) error {
-	return writeJSON(conn, bet)
+func SendBatch(conn net.Conn, bets []*Bet) error {
+	return writeJSON(conn, bets)
 }
 
-func ReadAck(conn net.Conn) (bool, string, error) {
+func ReadAck(conn net.Conn) (ok bool, errMsg string, err error) {
 	var ack ackWire
-	if err := readJSON(conn, &ack); err != nil {
+	if err = readJSON(conn, &ack); err != nil {
 		return false, "", err
 	}
 	if !ack.Ok {
