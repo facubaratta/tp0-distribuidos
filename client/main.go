@@ -25,14 +25,12 @@ func InitConfig() (*viper.Viper, error) {
 	v.SetEnvPrefix("cli")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Claves existentes
 	v.BindEnv("id")
 	v.BindEnv("server", "address")
 	v.BindEnv("loop", "period")
 	v.BindEnv("loop", "amount")
 	v.BindEnv("log", "level")
 
-	// NUEVO: claves para batches y datos
 	v.BindEnv("data", "dir")        // CLI_DATA_DIR
 	v.BindEnv("batch", "maxAmount") // CLI_BATCH_MAXAMOUNT
 	v.BindEnv("batch", "maxBytes")  // CLI_BATCH_MAXBYTES
@@ -116,6 +114,5 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGTERM)
 
 	client := common.NewClient(clientConfig)
-	// Enviamos usando batches y límite de bytes configurado
 	client.StartClientLoop(sigChan, allBets, batchMax, maxBytes)
 }
