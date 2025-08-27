@@ -53,7 +53,7 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 
 		batch := allBets[i:j]
 
-		log.Infof("action: batch_build | result: looking into if should recalculate | count:%d | bytes:%d | max:%d", len(batch), BatchFrameSize(batch), maxBytes)
+		log.Infof("action: batch_build | result: in_progress | count:%d | bytes:%d | max:%d", len(batch), BatchFrameSize(batch), maxBytes)
 
 		for len(batch) > 1 && BatchFrameSize(batch) > maxBytes {
 			batch = batch[:len(batch)-1]
