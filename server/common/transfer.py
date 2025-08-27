@@ -1,7 +1,7 @@
 import struct
 import json
 import socket
-from typing import Dict
+from typing import Dict, List
 from common.utils import Bet 
 
 def _recv_exact(sock: socket.socket, n: int) -> bytes:
@@ -51,6 +51,32 @@ def read_bet(sock: socket.socket) -> Bet:
             obj["birthdate"],
             obj["number"],
         )
+    except (KeyError, TypeError, ValueError) as e:
+        raise ProtocolError(str(e))
+
+def _to_bet(obj: Dict) -> Bet:
+    return Bet(
+        obj["agency"],
+        obj["first_name"],
+        obj["last_name"],
+        obj["document"],
+        obj["birthdate"],
+        obj["number"],
+    )
+    
+def read_batch(sock: socket.socket) -> List[Bet]:
+    """
+    Lee un JSON enmarcado que debe ser una lista de apuestas
+    con las claves: agency, first_name, last_name, document, birthdate, number
+    """
+    obj = read_json(sock)
+    if not isinstance(obj, list):
+        raise ProtocolError("expected a JSON array of bets")
+    bets: List[Bet] = []
+    try:
+        for item in obj:
+            bets.append(_to_bet(item))
+        return bets
     except (KeyError, TypeError, ValueError) as e:
         raise ProtocolError(str(e))
 
