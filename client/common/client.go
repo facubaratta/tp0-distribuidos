@@ -45,6 +45,7 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 		default:
 		}
 
+		// ventana [i, j)
 		j := i + batchMax
 		if j > len(allBets) {
 			j = len(allBets)
@@ -52,29 +53,29 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 
 		batch := allBets[i:j]
 
-		for FrameSizeForBatch(batch) > maxBytes && len(batch) > 0 {
+		for len(batch) > 1 && BatchFrameSize(batch) > maxBytes {
 			batch = batch[:len(batch)-1]
 		}
 
-		if len(batch) == 0 {
-			log.Warning("Bet too large to fit in maxBytes, skipping")
-			i++
-			continue
+		if len(batch) == 1 && BatchFrameSize(batch) > maxBytes {
+			log.Criticalf("single bet exceeds maxBytes (%d)", maxBytes)
+			return
 		}
 
 		if err := c.createClientSocket(); err != nil {
 			return
 		}
-
 		if err := SendBatch(c.conn, batch); err != nil {
 			_ = c.conn.Close()
 			log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v", c.config.ID, err)
 			return
 		}
+
 		ok, count, err := ReadAck(c.conn)
 		_ = c.conn.Close()
 		if err != nil || !ok || int(count) != len(batch) {
-			log.Errorf("action: receive_ack | result: fail | client_id: %v | error: %v | expected: %d got: %d", c.config.ID, err, len(batch), count)
+			log.Errorf("action: receive_ack | result: fail | client_id: %v | error: %v | expected: %d got: %d",
+				c.config.ID, err, len(batch), count)
 			return
 		}
 

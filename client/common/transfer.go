@@ -93,30 +93,19 @@ func ReadAck(conn net.Conn) (ok bool, count uint16, err error) {
 	return ok, count, nil
 }
 
-func betPayloadSize(b *Bet) int {
-	// agency(int32) + number(int32)
-	const fixedInts = 4 + 4
-
-	// Each string is encoded as: uint16 length + raw bytes
-	strFieldSize := func(s string) int { return 2 + len(s) }
-
-	return fixedInts +
-		strFieldSize(b.FirstName) +
-		strFieldSize(b.LastName) +
-		strFieldSize(b.Document) +
-		strFieldSize(b.Birthdate)
+func betWireSize(b *Bet) int {
+	// 4 (agency int32) +
+	// 2+len(first) + 2+len(last) + 2+len(doc) + 2+len(birth) +
+	// 4 (number int32)
+	return 4 + (2 + len(b.FirstName)) + (2 + len(b.LastName)) +
+		(2 + len(b.Document)) + (2 + len(b.Birthdate)) + 4
 }
 
-func FrameSizeForBatch(bets []*Bet) int {
-	const (
-		frameLen = 4
-		// payload fixed header: "BCH0"(4) + count(uint16)(2)
-		payloadHeader = 4 + 2
-	)
-
-	size := frameLen + payloadHeader
+func BatchFrameSize(bets []*Bet) int {
+	payload := 4 + 2 // BCHO + count
 	for _, b := range bets {
-		size += betPayloadSize(b)
+		payload += betWireSize(b)
 	}
-	return size
+	return 4 + payload // frame length + payload
+
 }
