@@ -4,6 +4,9 @@ from common.utils import Bet
 MAGIC_BET0 = b"BET0"
 MAGIC_BCH0 = b"BCH0"
 MAGIC_ACK0 = b"ACK0"
+MAGIC_DONE = b"DONE"
+MAGIC_QWIN = b"QWIN"
+MAGIC_WINS = b"WINS"
 
 def _recv_exact(sock: socket.socket, n: int) -> bytes:
     buf = bytearray()
@@ -27,6 +30,13 @@ def _read_u32(buf, pos): return struct.unpack_from(">I", buf, pos)[0], pos+4
 def _read_str(buf, pos):
     ln, pos = _read_u16(buf, pos)
     return bytes(buf[pos:pos+ln]).decode(), pos+ln
+
+def _write_u16(barr, v): barr.extend(struct.pack(">H", v))
+def _write_u32(barr, v): barr.extend(struct.pack(">I", v))
+def _write_str(barr, s: str):
+    data = s.encode()
+    _write_u16(barr, len(data))
+    barr.extend(data)
 
 def _decode_one_bet(buf: memoryview, pos: int):
     agency, pos = _read_u32(buf, pos)
@@ -55,5 +65,58 @@ def send_ack(sock: socket.socket, ok: bool, count: int):
     payload = bytearray()
     payload.extend(MAGIC_ACK0)
     payload.append(1 if ok else 0)
-    payload.extend(struct.pack(">H", count))
+    _write_u16(payload, count)
     write_frame(sock, payload)
+
+def read_done(sock: socket.socket) -> int:
+    """Devuelve agency_id (int)."""
+    f = read_frame(sock)
+    if len(f) < 8 or f[:4] != MAGIC_DONE:
+        raise ValueError("bad DONE")
+    buf = memoryview(f)
+    _, pos = 4, 4
+    agency_id, pos = _read_u32(buf, pos)
+    return int(agency_id)
+
+def send_done(sock: socket.socket, agency_id: int):
+    payload = bytearray()
+    payload.extend(MAGIC_DONE)
+    _write_u32(payload, int(agency_id))
+    write_frame(sock, payload)
+
+def read_query_winners(sock: socket.socket) -> int:
+    """Devuelve agency_id (int) pedido en la consulta."""
+    f = read_frame(sock)
+    if len(f) < 8 or f[:4] != MAGIC_QWIN:
+        raise ValueError("bad QWIN")
+    buf = memoryview(f)
+    _, pos = 4, 4
+    agency_id, pos = _read_u32(buf, pos)
+    return int(agency_id)
+
+def send_query_winners(sock: socket.socket, agency_id: int):
+    payload = bytearray()
+    payload.extend(MAGIC_QWIN)
+    _write_u32(payload, int(agency_id))
+    write_frame(sock, payload)
+
+def send_winners(sock: socket.socket, documents: list[str]):
+    payload = bytearray()
+    payload.extend(MAGIC_WINS)
+    _write_u16(payload, len(documents))
+    for dni in documents:
+        _write_str(payload, dni)
+    write_frame(sock, payload)
+
+def read_winners(sock: socket.socket) -> list[str]:
+    f = read_frame(sock)
+    if len(f) < 6 or f[:4] != MAGIC_WINS:
+        raise ValueError("bad WINS")
+    buf = memoryview(f)
+    pos = 4
+    count, pos = _read_u16(buf, pos)
+    out = []
+    for _ in range(count):
+        s, pos = _read_str(buf, pos)
+        out.append(s)
+    return out
