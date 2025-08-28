@@ -12,6 +12,11 @@ import (
 const (
 	magicBCH0 = "BCH0"
 	magicACK0 = "ACK0"
+
+	// E7:
+	magicDONE = "DONE" // cliente -> server: terminé de enviar
+	magicQWIN = "QWIN" // cliente -> server: consultar ganadores de una agencia
+	magicWINS = "WINS" // server  -> cliente: respuesta con DNIs ganadores
 )
 
 func atoiSafe(s string) int {
@@ -65,6 +70,20 @@ func encodeBetFields(b *bytes.Buffer, bet *Bet) {
 	_ = binary.Write(b, binary.BigEndian, int32(atoiSafe(bet.Number)))
 }
 
+func decodeString(buf []byte, pos *int) (string, error) {
+	if *pos+2 > len(buf) {
+		return "", io.ErrUnexpectedEOF
+	}
+	l := int(binary.BigEndian.Uint16(buf[*pos : *pos+2]))
+	*pos += 2
+	if *pos+l > len(buf) {
+		return "", io.ErrUnexpectedEOF
+	}
+	s := string(buf[*pos : *pos+l])
+	*pos += l
+	return s, nil
+}
+
 // ---------- batch ----------
 func SendBatch(conn net.Conn, bets []*Bet) error {
 	var p bytes.Buffer
@@ -90,6 +109,45 @@ func ReadAck(conn net.Conn) (ok bool, count uint16, err error) {
 	pos++
 	count = binary.BigEndian.Uint16(f[pos : pos+2])
 	return ok, count, nil
+}
+
+func SendDone(conn net.Conn) error {
+	var p bytes.Buffer
+	p.WriteString(magicDONE)
+	return writeFrame(conn, p.Bytes())
+}
+
+func SendQueryWinners(conn net.Conn, agencyID string) error {
+	var p bytes.Buffer
+	p.WriteString(magicQWIN)
+	encodeString(&p, agencyID)
+	return writeFrame(conn, p.Bytes())
+}
+
+func ReadWinners(conn net.Conn) ([]string, error) {
+	f, e := readFrame(conn)
+	if e != nil {
+		return nil, e
+	}
+	if len(f) < 4 || string(f[:4]) != magicWINS {
+		return nil, errors.New("bad WINS frame")
+	}
+	pos := 4
+	if pos+2 > len(f) {
+		return nil, io.ErrUnexpectedEOF
+	}
+	n := int(binary.BigEndian.Uint16(f[pos : pos+2]))
+	pos += 2
+
+	winners := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		s, err := decodeString(f, &pos)
+		if err != nil {
+			return nil, err
+		}
+		winners = append(winners, s)
+	}
+	return winners, nil
 }
 
 func betWireSize(b *Bet) int {
