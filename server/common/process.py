@@ -1,5 +1,6 @@
 import logging
 import socket
+from time import sleep
 from common.transfer import MAGIC_BCH0, MAGIC_DONE, MAGIC_QWIN, _decode_one_bet, _read_u16, _read_u32, send_ack, send_winners
 from common.utils import has_won, load_bets, store_bets
 
@@ -43,6 +44,9 @@ def process_frame(self, frame: bytes, client_sock: socket.socket):
         pos = 4
         agency_id, pos = _read_u32(buf, pos)
         agency_id = int(agency_id)
+
+        while not self.draw_done:
+            sleep(0.02)
 
         docs = self.winners_by_agency.get(agency_id, [])
         send_winners(client_sock, docs)
