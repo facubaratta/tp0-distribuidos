@@ -88,5 +88,36 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 		case <-time.After(c.config.LoopPeriod):
 		}
 	}
-	log.Debugf("action: batches_done | result: success | client_id: %v", c.config.ID)
+
+	log.Infof("action: batches_done | result: success | client_id: %v", c.config.ID)
+
+	if err := c.createClientSocket(); err != nil {
+		return
+	}
+
+	if err := SendDone(c.conn); err != nil {
+		log.Errorf("action: send_done | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		_ = c.conn.Close()
+		return
+	}
+	_ = c.conn.Close()
+
+	if err := c.createClientSocket(); err != nil {
+		return
+	}
+
+	if err := SendQueryWinners(c.conn, c.config.ID); err != nil {
+		log.Errorf("action: query_winners | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		_ = c.conn.Close()
+		return
+	}
+
+	winners, err := ReadWinners(c.conn)
+	_ = c.conn.Close()
+	if err != nil {
+		log.Errorf("action: read_winners | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return
+	}
+
+	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d", len(winners))
 }
