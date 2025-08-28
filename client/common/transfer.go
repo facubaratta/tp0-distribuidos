@@ -12,11 +12,9 @@ import (
 const (
 	magicBCH0 = "BCH0"
 	magicACK0 = "ACK0"
-
-	// E7:
-	magicDONE = "DONE" // cliente -> server: terminé de enviar
-	magicQWIN = "QWIN" // cliente -> server: consultar ganadores de una agencia
-	magicWINS = "WINS" // server  -> cliente: respuesta con DNIs ganadores
+	magicDONE = "DONE"
+	magicQWIN = "QWIN"
+	magicWINS = "WINS"
 )
 
 func atoiSafe(s string) int {
@@ -125,12 +123,13 @@ func SendQueryWinners(conn net.Conn, agencyID int) error {
 	return writeFrame(conn, p.Bytes())
 }
 
+// Frame: [len:4][ "WINS":4 ][ count:uint16 ][ (u16 len + bytes) * count ]
 func ReadWinners(conn net.Conn) ([]string, error) {
 	f, e := readFrame(conn)
 	if e != nil {
 		return nil, e
 	}
-	if len(f) < 4 || string(f[:4]) != magicWINS {
+	if len(f) < 6 || string(f[:4]) != magicWINS {
 		return nil, errors.New("bad WINS frame")
 	}
 	pos := 4
@@ -160,10 +159,9 @@ func betWireSize(b *Bet) int {
 }
 
 func BatchFrameSize(bets []*Bet) int {
-	payload := 4 + 2 // BCHO + count
+	payload := 4 + 2 // BCH0 + count
 	for _, b := range bets {
 		payload += betWireSize(b)
 	}
 	return 4 + payload // frame length + payload
-
 }
