@@ -111,16 +111,17 @@ func ReadAck(conn net.Conn) (ok bool, count uint16, err error) {
 	return ok, count, nil
 }
 
-func SendDone(conn net.Conn) error {
+func SendDone(conn net.Conn, agencyID int) error {
 	var p bytes.Buffer
 	p.WriteString(magicDONE)
+	_ = binary.Write(&p, binary.BigEndian, uint32(agencyID))
 	return writeFrame(conn, p.Bytes())
 }
 
-func SendQueryWinners(conn net.Conn, agencyID string) error {
+func SendQueryWinners(conn net.Conn, agencyID int) error {
 	var p bytes.Buffer
 	p.WriteString(magicQWIN)
-	encodeString(&p, agencyID)
+	_ = binary.Write(&p, binary.BigEndian, uint32(agencyID))
 	return writeFrame(conn, p.Bytes())
 }
 

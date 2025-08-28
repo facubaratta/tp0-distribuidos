@@ -37,6 +37,8 @@ func (c *Client) createClientSocket() error {
 }
 
 func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMax int, maxBytes int) {
+	agencyId := atoiSafe(c.config.ID)
+
 	for i := 0; i < len(allBets); {
 		select {
 		case <-sigChan:
@@ -95,7 +97,7 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 		return
 	}
 
-	if err := SendDone(c.conn); err != nil {
+	if err := SendDone(c.conn, agencyId); err != nil {
 		log.Errorf("action: send_done | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		_ = c.conn.Close()
 		return
@@ -106,7 +108,7 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 		return
 	}
 
-	if err := SendQueryWinners(c.conn, c.config.ID); err != nil {
+	if err := SendQueryWinners(c.conn, agencyId); err != nil {
 		log.Errorf("action: query_winners | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		_ = c.conn.Close()
 		return
