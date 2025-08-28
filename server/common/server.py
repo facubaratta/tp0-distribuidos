@@ -3,7 +3,7 @@ import socket
 import logging
 
 from common.transfer import read_frame, send_ack
-from server.common.process import process_frame
+from common.process import process_frame
 
 class Server:
     def __init__(self, port, listen_backlog):
