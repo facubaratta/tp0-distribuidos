@@ -1,7 +1,7 @@
 import logging
 import socket
-from server.common.transfer import MAGIC_BCH0, MAGIC_DONE, MAGIC_QWIN, _decode_one_bet, _read_u16, _read_u32, send_ack, send_winners
-from server.common.utils import has_won, load_bets, store_bets
+from common.transfer import MAGIC_BCH0, MAGIC_DONE, MAGIC_QWIN, _decode_one_bet, _read_u16, _read_u32, send_ack, send_winners
+from common.utils import has_won, load_bets, store_bets
 
 def process_frame(self, frame: bytes, client_sock: socket.socket):
     magic = frame[:4]
