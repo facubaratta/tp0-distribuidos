@@ -18,6 +18,7 @@ class Server:
         self.done_agencies: set[int] = set()
         self.draw_done = False
         self.winners_by_agency: dict[int, list[str]] = {}
+        self._pending_qwin = [] 
 
     def graceful_shutdown(self):
         self.running = False
@@ -49,25 +50,20 @@ class Server:
                 logging.error(f'action: accept_error | error: {e}')
 
     def __handle_client_connection(self, client_sock: socket.socket):
+        should_close = True
         try:
             frame = read_frame(client_sock)
-            if len(frame) < 4:
-                raise ValueError("empty or short frame")
-            process_frame(self, frame, client_sock)
+            should_close = process_frame(self, frame, client_sock)
         except Exception as e:
             logging.error('action: handle_connection | result: fail | error: %s', e)
-            try:
-                send_ack(client_sock, ok=False, count=0)
-            except Exception:
-                pass
+            try: send_ack(client_sock, ok=False, count=0)
+            except Exception: pass
         finally:
-            try:
-                client_sock.close()
-            finally:
-                try:
-                    self.client_sockets.remove(client_sock)
-                except ValueError:
-                    pass
+            if should_close:
+                try: client_sock.close()
+                finally:
+                    try: self.client_sockets.remove(client_sock)
+                    except ValueError: pass
 
     def __accept_new_connection(self):
         logging.info('action: accept_connections | result: in_progress')
