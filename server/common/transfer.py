@@ -1,5 +1,7 @@
+import logging
 import socket, struct
-from common.utils import Bet
+import time
+from common.utils import Bet, has_won, load_bets, store_bets
 
 MAGIC_BET0 = b"BET0"
 MAGIC_BCH0 = b"BCH0"

@@ -1,18 +1,25 @@
+import os
 import socket
 import logging
 
-from common.transfer import read_batch, send_ack
-from common.utils import store_bets
+from common.transfer import read_frame, send_ack
+from server.common.process import process_frame
 
 class Server:
     def __init__(self, port, listen_backlog):
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
         self.running = True
         self.client_sockets = []
 
-    def graceful_shutdown(self, signum=None, frame=None):
+        self.expected_clients = int(os.getenv("CLIENTS", "5"))
+        self.done_agencies: set[int] = set()
+        self.draw_done = False
+        self.winners_by_agency: dict[int, list[str]] = {}
+
+    def graceful_shutdown(self):
         self.running = False
         if self._server_socket:
             try:
@@ -34,6 +41,7 @@ class Server:
                 client_sock = self.__accept_new_connection()
                 if client_sock:
                     self.client_sockets.append(client_sock)
+                    # Blocking, one-at-a-time
                     self.__handle_client_connection(client_sock)
             except OSError as e:
                 if not self.running:
@@ -42,19 +50,12 @@ class Server:
 
     def __handle_client_connection(self, client_sock: socket.socket):
         try:
-            # Read a whole BCH0 batch
-            bets = read_batch(client_sock)
-
-            # Persist all bets
-            store_bets(bets)
-
-            # Log and ACK for the whole batch
-            logging.info("action: apuesta_recibida | result: success | cantidad: %d", len(bets))
-            send_ack(client_sock, ok=True, count=len(bets))
-
+            frame = read_frame(client_sock)
+            if len(frame) < 4:
+                raise ValueError("empty or short frame")
+            process_frame(self, frame, client_sock)
         except Exception as e:
-            logging.error('action: apuesta_recibida | result: fail | error: %s', e)
-            # Single ACK for the whole batch, failure
+            logging.error('action: handle_connection | result: fail | error: %s', e)
             try:
                 send_ack(client_sock, ok=False, count=0)
             except Exception:
