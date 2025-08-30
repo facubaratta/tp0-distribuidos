@@ -1,6 +1,7 @@
 package common
 
 import (
+	"io"
 	"net"
 	"os"
 	"time"
@@ -36,8 +37,11 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMax int, maxBytes int) {
-	for i := 0; i < len(allBets); {
+func (c *Client) StartClientLoop(sigChan chan os.Signal, src BetSource, batchMax int, maxBytes int) {
+	defer src.Close()
+
+	var pending *Bet
+	for {
 		select {
 		case <-sigChan:
 			log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
@@ -45,21 +49,46 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 		default:
 		}
 
-		// ventana [i, j)
-		j := i + batchMax
-		if j > len(allBets) {
-			j = len(allBets)
+		batch := make([]*Bet, 0, batchMax)
+		for len(batch) < batchMax {
+			var bet *Bet
+			var err error
+
+			if pending != nil {
+				bet = pending
+				pending = nil
+			} else {
+				bet, err = src.Next()
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					log.Errorf("action: read_next_bet | result: fail | client_id: %v | error: %v", c.config.ID, err)
+					return
+				}
+			}
+
+			// If adding this bet would exceed maxBytes, defer it to next batch
+			if len(batch) == 0 {
+				// single bet case must fit
+				if 4+2+betWireSize(bet)+4 > maxBytes || BatchFrameSize([]*Bet{bet}) > maxBytes { // defensive
+					log.Criticalf("single bet exceeds maxBytes (%d)", maxBytes)
+					return
+				}
+				batch = append(batch, bet)
+				continue
+			}
+
+			tentative := append(batch, bet)
+			if BatchFrameSize(tentative) > maxBytes {
+				pending = bet
+				break
+			}
+			batch = tentative
 		}
 
-		batch := allBets[i:j]
-
-		for len(batch) > 1 && BatchFrameSize(batch) > maxBytes {
-			batch = batch[:len(batch)-1]
-		}
-
-		if len(batch) == 1 && BatchFrameSize(batch) > maxBytes {
-			log.Criticalf("single bet exceeds maxBytes (%d)", maxBytes)
-			return
+		if len(batch) == 0 {
+			break
 		}
 
 		if err := c.createClientSocket(); err != nil {
@@ -78,8 +107,6 @@ func (c *Client) StartClientLoop(sigChan chan os.Signal, allBets []*Bet, batchMa
 				c.config.ID, err, len(batch), count)
 			return
 		}
-
-		i += len(batch)
 
 		select {
 		case <-sigChan:

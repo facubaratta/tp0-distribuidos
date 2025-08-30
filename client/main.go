@@ -93,11 +93,11 @@ func main() {
 	batchMax := v.GetInt("batch.maxAmount")
 	maxBytes := v.GetInt("batch.maxBytes")
 
-	allBets, err := common.LoadBetsFromCSV("agency.csv", id)
-	if err != nil {
-		log.Criticalf("action: load_bets | result: fail | client_id: %v | error: %v", id, err)
-		return
-	}
+    betsSrc, err := common.NewCSVBetIterator("agency.csv", id)
+    if err != nil {
+        log.Criticalf("action: open_bets | result: fail | client_id: %v | error: %v", id, err)
+        return
+    }
 
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
@@ -109,6 +109,6 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM)
 
-	client := common.NewClient(clientConfig)
-	client.StartClientLoop(sigChan, allBets, batchMax, maxBytes)
+    client := common.NewClient(clientConfig)
+    client.StartClientLoop(sigChan, betsSrc, batchMax, maxBytes)
 }

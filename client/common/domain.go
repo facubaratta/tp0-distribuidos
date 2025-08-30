@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -32,23 +33,37 @@ func betFromCSVRow(agencyID string, row []string) (*Bet, error) {
 	}, nil
 }
 
-func LoadBetsFromCSV(path string, agencyID string) ([]*Bet, error) {
+type BetSource interface {
+	Next() (*Bet, error)
+	Close() error
+}
+
+type CSVBetIterator struct {
+	f        *os.File
+	r        *csv.Reader
+	agencyID string
+}
+
+func NewCSVBetIterator(path, agencyID string) (*CSVBetIterator, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("no se pudo abrir %s: %w", path, err)
 	}
-	defer f.Close()
-
 	r := csv.NewReader(bufio.NewReader(f))
 	r.TrimLeadingSpace = true
-	records, err := r.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("error leyendo CSV %s: %w", path, err)
-	}
+	return &CSVBetIterator{f: f, r: r, agencyID: agencyID}, nil
+}
 
-	bets := make([]*Bet, 0, len(records))
-	for _, rec := range records {
-		// saltar filas vacías
+func (it *CSVBetIterator) Next() (*Bet, error) {
+	for {
+		rec, err := it.r.Read()
+		if err != nil {
+			if err == io.EOF {
+				return nil, io.EOF
+			}
+			return nil, fmt.Errorf("error leyendo CSV: %w", err)
+		}
+		// skip empty rows
 		allEmpty := true
 		for _, c := range rec {
 			if strings.TrimSpace(c) != "" {
@@ -59,11 +74,8 @@ func LoadBetsFromCSV(path string, agencyID string) ([]*Bet, error) {
 		if allEmpty {
 			continue
 		}
-		b, err := betFromCSVRow(agencyID, rec)
-		if err != nil {
-			return nil, err
-		}
-		bets = append(bets, b)
+		return betFromCSVRow(it.agencyID, rec)
 	}
-	return bets, nil
 }
+
+func (it *CSVBetIterator) Close() error { return it.f.Close() }
