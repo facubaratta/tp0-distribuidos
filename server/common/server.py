@@ -20,10 +20,10 @@ class Server:
                 logging.info('action: close_fd | target: server_socket | result: success')
             except OSError as e:
                 logging.error(f'action: close_fd | target: server_socket | result: fail | error: {e}')
-        for cs in list(self.client_sockets):
+        for client_socket in self.client_sockets:
             try:
-                cs.close()
-                logging.info('action: close_fd | target: client_socket | result: success')
+                client_socket.close()
+                logging.info(f'action: close_fd | target: client_socket | result: success')
             except OSError as e:
                 logging.error(f'action: close_fd | target: client_socket | result: fail | error: {e}')
         logging.info('action: shutdown | result: success')
