@@ -64,9 +64,7 @@ Se eliminó las variables de entorno del script generador de docker compose, y a
 Inicialmente cargaba todo el archivo en memoria pero lo cambié 😿
 
 Empezando por `domain.go`, la función helper que cargaba una apuesta desde las variables de entorno es reemplazada por un iterador que permite ir leyendo apuestas de una manera ya parseada y completamente abstraída. Este iterador es inicializado en `main.go` y se pasa a `StartClientLoop` como una variable junto con `batchMax` y `maxBytes`.
-En el loop del cliente envia los batches iterando secuencialmente. También tiene un `pending` habilitado en caso de que el batch supere los maxBytes (8kb). Esto se chequea dinámicamente, lo cual es un poco overkill tal vez.
-
-<img src="https://i.imgflip.com/2q9wdh.jpg?a487704" alt="Sad image" width="200"/>
+En el loop del cliente envia los batches iterando secuencialmente. También tiene un `pending` habilitado en caso de que el batch supere los maxBytes (8kb). Esto se chequea dinámicamente, lo cual es un poco [overkill](https://i.imgflip.com/2q9wdh.jpg?a487704) tal vez.
 
 ### Ejercicio N°7:
 
