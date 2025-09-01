@@ -68,6 +68,10 @@ En el loop del cliente envia los batches iterando secuencialmente. También tien
 
 ### Ejercicio N°7:
 
+Para este ejercicio se agrego más tipos de mensajes: DONE (finalizó de mandar todos lo batches), QWIN (el cliente query de wins de su agencia), y WINS (el servidor le manda los ganadores de su agencia en particular)
+
+Moví la lógica de procesar los mensajes a `process.py`. Aquí se hace un pequeño peek al magic. Dependiendo de lo que manda el cliente (BCH0, DONE, QWIN), se guarda apuestas, se encola para responder ganadores, o se procede a hacer la votación. Esta última depende de si llegaron tantos DONE como se esperaban.
+
 ## Parte 3: Repaso de Concurrencia
 
 En este ejercicio es importante considerar los mecanismos de sincronización a utilizar para el correcto funcionamiento de la persistencia.

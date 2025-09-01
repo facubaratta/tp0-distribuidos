@@ -1,7 +1,6 @@
 import socket, struct
 from common.utils import Bet
 
-MAGIC_BET0 = b"BET0"
 MAGIC_BCH0 = b"BCH0"
 MAGIC_ACK0 = b"ACK0"
 MAGIC_DONE = b"DONE"
