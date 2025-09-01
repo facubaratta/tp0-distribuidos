@@ -9,9 +9,21 @@ Facundo Baratta - 104886
 Como es sugerido en la solución, `generar-compose.sh` llama a un script de python (creativamente llamado) `generar-compose.py`. El script de bash recibe dos parametros: nombre del archivo de entrada, y de salida. Estos son pasados al script de python. Si la cantidad de variables de entrada es distinta de dos, se muestra ayuda de uso.
 El script de python genera un archivo docker-compose con estructura similar al suministrado en el repositorio inicialmente.
 
+Para ejecutarlo:
+
+`./generar-compose.sh <archivo_de_salida> N`
+
+Ejemplo:
+
+`./generar-compose.sh <archivo_de_salida> N`
+
+Luego se puede levantar con el Makefile:
+
+`make docker-compose-up`
+
 ### Ejercicio N°2:
 
-Para este ejercicio se montó los archivos de configuración para el servidor y cada cliente respectivamente. Luego, se eliminó las variables de entorno generadas para el .yml para que no pisen a lo seteado en la configuración. Finalmente, se eliminó copiar el archivo de configuración en el Dockerfile. No es necesario ya que se monta como volumen.
+Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera reconstruír las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida por fuera de la imagen (hint: `docker volumes`). La ejecución es idéntica al ejercico anterior.
 
 ### Ejercicio N°3:
 
