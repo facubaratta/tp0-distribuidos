@@ -15,7 +15,11 @@ Para ejecutarlo:
 
 Ejemplo:
 
-`./generar-compose.sh docker-compose-dev.yaml 5`
+`./generar-compose.sh <archivo_de_salida> N`
+
+Luego se puede levantar con el Makefile:
+
+`make docker-compose-up`
 
 ### Ejercicio N°2:
 
