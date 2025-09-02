@@ -1,4 +1,3 @@
-import struct
 import socket
 from typing import Optional
 
@@ -21,22 +20,22 @@ def _recv_exact(sock: socket.socket, n: int) -> bytes:
 
 def read_frame(sock: socket.socket) -> bytes:
     header = _recv_exact(sock, 4)
-    (length,) = struct.unpack(">I", header)
+    length = int.from_bytes(header, byteorder="big", signed=False)
     return _recv_exact(sock, length) if length else b""
 
 def write_frame(sock: socket.socket, payload: bytes):
-    header = struct.pack(">I", len(payload))
+    header = len(payload).to_bytes(4, byteorder="big", signed=False)
     sock.sendall(header)
     sock.sendall(payload)
 
 # ---------- helpers (len:uint16 + bytes) ----------
 
 def _read_u16(buf: memoryview, offset: int) -> tuple[int, int]:
-    (v,) = struct.unpack_from(">H", buf, offset)
+    v = int.from_bytes(bytes(buf[offset:offset+2]), byteorder="big", signed=False)
     return v, offset + 2
 
 def _read_u32(buf: memoryview, offset: int) -> tuple[int, int]:
-    (v,) = struct.unpack_from(">I", buf, offset)
+    v = int.from_bytes(bytes(buf[offset:offset+4]), byteorder="big", signed=False)
     return v, offset + 4
 
 def _read_str(buf: memoryview, offset: int) -> tuple[str, int]:
@@ -45,7 +44,7 @@ def _read_str(buf: memoryview, offset: int) -> tuple[str, int]:
     return s, offset + n
 
 def _write_u16(parts: list[bytes], v: int):
-    parts.append(struct.pack(">H", v))
+    parts.append(v.to_bytes(2, byteorder="big", signed=False))
 
 def _write_str(parts: list[bytes], s: str):
     b = s.encode("utf-8")
