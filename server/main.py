@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import signal
+import multiprocessing as mp
 
 global server
 server = None
@@ -45,6 +46,11 @@ def initialize_config():
 
 
 def main():
+    try:
+        mp.set_start_method('fork')
+    except (RuntimeError, ValueError):
+        pass
+
     config_params = initialize_config()
     logging_level = config_params["logging_level"]
     port = config_params["port"]
@@ -57,7 +63,6 @@ def main():
     logging.debug(f"action: config | result: success | port: {port} | "
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
 
-    # Initialize server and start server loop
     server = Server(port, listen_backlog)
     signal.signal(signal.SIGTERM, graceful_shutdown)
     server.run()
