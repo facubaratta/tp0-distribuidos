@@ -1,4 +1,4 @@
-import socket, struct
+import socket
 from common.utils import Bet
 
 MAGIC_BET0 = b"BET0"
@@ -15,15 +15,22 @@ def _recv_exact(sock: socket.socket, n: int) -> bytes:
     return bytes(buf)
 
 def read_frame(sock: socket.socket) -> bytes:
-    (length,) = struct.unpack(">I", _recv_exact(sock, 4))
+    header = _recv_exact(sock, 4)
+    length = int.from_bytes(header, byteorder="big", signed=False)
     return _recv_exact(sock, length) if length else b""
 
 def write_frame(sock: socket.socket, payload: bytes):
-    sock.sendall(struct.pack(">I", len(payload)) + payload)
+    header = len(payload).to_bytes(4, byteorder="big", signed=False)
+    sock.sendall(header + payload)
 
 # --------- decode helpers ----------
-def _read_u16(buf, pos): return struct.unpack_from(">H", buf, pos)[0], pos+2
-def _read_u32(buf, pos): return struct.unpack_from(">I", buf, pos)[0], pos+4
+def _read_u16(buf, pos):
+    v = int.from_bytes(bytes(buf[pos:pos+2]), byteorder="big", signed=False)
+    return v, pos + 2
+
+def _read_u32(buf, pos):
+    v = int.from_bytes(bytes(buf[pos:pos+4]), byteorder="big", signed=False)
+    return v, pos + 4
 def _read_str(buf, pos):
     ln, pos = _read_u16(buf, pos)
     return bytes(buf[pos:pos+ln]).decode(), pos+ln
@@ -55,5 +62,5 @@ def send_ack(sock: socket.socket, ok: bool, count: int):
     payload = bytearray()
     payload.extend(MAGIC_ACK0)
     payload.append(1 if ok else 0)
-    payload.extend(struct.pack(">H", count))
+    payload.extend(count.to_bytes(2, byteorder="big", signed=False))
     write_frame(sock, payload)
