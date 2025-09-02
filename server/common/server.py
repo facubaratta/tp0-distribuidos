@@ -71,6 +71,11 @@ class Server:
                 p.join(timeout=1)
             except Exception:
                 pass
+        # Shutdown Manager process to release resources
+        try:
+            self._manager.shutdown()
+        except Exception:
+            pass
         logging.info('action: shutdown | result: success')
 
     def run(self):
@@ -100,8 +105,17 @@ class Server:
                             self.client_sockets.remove(client_sock)
                         except ValueError:
                             pass
-                    # Reap finished children occasionally
-                    self._children = [ch for ch in self._children if ch.is_alive()]
+                    # Reap finished children eagerly to avoid zombies
+                    alive = []
+                    for ch in self._children:
+                        if ch.is_alive():
+                            alive.append(ch)
+                        else:
+                            try:
+                                ch.join(timeout=0)
+                            except Exception:
+                                pass
+                    self._children = alive
             except OSError as e:
                 if not self.running:
                     break
