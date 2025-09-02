@@ -6,6 +6,7 @@ from common.transfer import (
 )
 from common.utils import has_won, load_bets, store_bets
 
+# Returns si deberia cerrar
 def process_frame(self, frame: bytes, client_sock: socket.socket) -> bool:
     if len(frame) < 4:
         raise ValueError("short frame")
@@ -22,33 +23,38 @@ def process_frame(self, frame: bytes, client_sock: socket.socket) -> bool:
         logging.info("action: apuesta_recibida | result: success | cantidad: %d", len(bets))
         send_ack(client_sock, ok=True, count=len(bets))
         return True  # cerrar socket
+    
+    draw_done_attr = getattr(self, 'draw_done_event')
+    is_draw_done = draw_done_attr.is_set()
+    set_draw_done = draw_done_attr.set
+    wait_draw_done = draw_done_attr.wait
 
     if magic == MAGIC_DONE:
         buf = memoryview(frame); pos = 4
         agency_id, pos = _read_u32(buf, pos)
         agency_id = int(agency_id)
-        self.done_agencies.add(agency_id)
+        try:
+            self.done_agencies[agency_id] = True
+        except Exception:
+            pass
 
         # ¿ya están todos?
-        if not self.draw_done and len(self.done_agencies) >= self.expected_clients:
+        if (not is_draw_done) and len(self.done_agencies) >= self.expected_clients:
             winners = {}
             for b in load_bets():
                 if has_won(b):
                     winners.setdefault(b.agency, []).append(b.document)
-            self.winners_by_agency = winners
-            self.draw_done = True
-            logging.info("action: sorteo | result: success")
-
-            # Responder todos los QWIN pendientes y cerrar sus sockets
-            pending = self._pending_qwin
-            self._pending_qwin = []
-            for s, ag in pending:
+            try:
                 try:
-                    docs = self.winners_by_agency.get(ag, [])
-                    send_winners(s, docs)
-                finally:
-                    try: s.close()
-                    except: pass
+                    for k in list(self.winners_by_agency.keys()):
+                        del self.winners_by_agency[k]
+                except Exception:
+                    pass
+                for ag, docs in winners.items():
+                    self.winners_by_agency[int(ag)] = list(docs)
+            finally:
+                set_draw_done()
+            logging.info("action: sorteo | result: success")
         return True  # DONE no tiene respuesta; cerrar
 
     if magic == MAGIC_QWIN:
@@ -56,12 +62,12 @@ def process_frame(self, frame: bytes, client_sock: socket.socket) -> bool:
         agency_id, pos = _read_u32(buf, pos)
         agency_id = int(agency_id)
 
-        if not self.draw_done:
-            # Encolar y mantener abierto
-            self._pending_qwin.append((client_sock, agency_id))
-            return False
-        # Ya hay sorteo → responder ahora
-        docs = self.winners_by_agency.get(agency_id, [])
+        if not is_draw_done:
+            wait_draw_done()
+        try:
+            docs = self.winners_by_agency.get(agency_id, [])
+        except Exception:
+            docs = []
         send_winners(client_sock, docs)
         return True
 
