@@ -1,7 +1,7 @@
 import logging, socket
 from common.transfer import (
     MAGIC_BCH0, MAGIC_DONE, MAGIC_QWIN,
-    _decode_one_bet, _read_u16, _read_u32,
+    decode_one_bet, read_u16, read_u32,
     send_ack, send_winners
 )
 from common.utils import has_won, load_bets, store_bets
@@ -13,10 +13,10 @@ def process_frame(self, frame: bytes, client_sock: socket.socket) -> bool:
 
     if magic == MAGIC_BCH0:
         buf = memoryview(frame); pos = 4
-        count, pos = _read_u16(buf, pos)
+        count, pos = read_u16(buf, pos)
         bets = []
         for _ in range(count):
-            bet, pos = _decode_one_bet(buf, pos)
+            bet, pos = decode_one_bet(buf, pos)
             bets.append(bet)
         store_bets(bets)
         logging.info("action: apuesta_recibida | result: success | cantidad: %d", len(bets))
@@ -25,7 +25,7 @@ def process_frame(self, frame: bytes, client_sock: socket.socket) -> bool:
 
     if magic == MAGIC_DONE:
         buf = memoryview(frame); pos = 4
-        agency_id, pos = _read_u32(buf, pos)
+        agency_id, pos = read_u32(buf, pos)
         agency_id = int(agency_id)
         self.done_agencies.add(agency_id)
 
@@ -53,7 +53,7 @@ def process_frame(self, frame: bytes, client_sock: socket.socket) -> bool:
 
     if magic == MAGIC_QWIN:
         buf = memoryview(frame); pos = 4
-        agency_id, pos = _read_u32(buf, pos)
+        agency_id, pos = read_u32(buf, pos)
         agency_id = int(agency_id)
 
         if not self.draw_done:

@@ -1,4 +1,4 @@
-import socket, struct
+import socket
 from common.utils import Bet
 
 MAGIC_BCH0 = b"BCH0"
@@ -17,33 +17,42 @@ def _recv_exact(sock: socket.socket, n: int) -> bytes:
     return bytes(buf)
 
 def read_frame(sock: socket.socket) -> bytes:
-    (length,) = struct.unpack(">I", _recv_exact(sock, 4))
+    header = _recv_exact(sock, 4)
+    length = int.from_bytes(header, byteorder="big", signed=False)
     return _recv_exact(sock, length) if length else b""
 
 def write_frame(sock: socket.socket, payload: bytes):
-    sock.sendall(struct.pack(">I", len(payload)) + payload)
+    header = len(payload).to_bytes(4, byteorder="big", signed=False)
+    sock.sendall(header + payload)
 
 # --------- decode helpers ----------
-def _read_u16(buf, pos): return struct.unpack_from(">H", buf, pos)[0], pos+2
-def _read_u32(buf, pos): return struct.unpack_from(">I", buf, pos)[0], pos+4
+def read_u16(buf, pos):
+    v = int.from_bytes(bytes(buf[pos:pos+2]), byteorder="big", signed=False)
+    return v, pos + 2
+def read_u32(buf, pos):
+    v = int.from_bytes(bytes(buf[pos:pos+4]), byteorder="big", signed=False)
+    return v, pos + 4
 def _read_str(buf, pos):
-    ln, pos = _read_u16(buf, pos)
+    ln, pos = read_u16(buf, pos)
     return bytes(buf[pos:pos+ln]).decode(), pos+ln
 
-def _write_u16(barr, v): barr.extend(struct.pack(">H", v))
-def _write_u32(barr, v): barr.extend(struct.pack(">I", v))
+def _write_u16(barr, v):
+    barr.extend(int(v).to_bytes(2, byteorder="big", signed=False))
+
+def _write_u32(barr, v):
+    barr.extend(int(v).to_bytes(4, byteorder="big", signed=False))
 def _write_str(barr, s: str):
     data = s.encode()
     _write_u16(barr, len(data))
     barr.extend(data)
 
-def _decode_one_bet(buf: memoryview, pos: int):
-    agency, pos = _read_u32(buf, pos)
+def decode_one_bet(buf: memoryview, pos: int):
+    agency, pos = read_u32(buf, pos)
     first, pos = _read_str(buf, pos)
     last, pos  = _read_str(buf, pos)
     doc, pos   = _read_str(buf, pos)
     birth, pos = _read_str(buf, pos)
-    number, pos = _read_u32(buf, pos)
+    number, pos = read_u32(buf, pos)
     return Bet(str(agency), first, last, doc, birth, str(number)), pos
 
 # --------- read batch ---------
@@ -53,10 +62,10 @@ def read_batch(sock: socket.socket):
         raise ValueError("bad BCH0")
     buf = memoryview(f)
     pos = 4
-    count, pos = _read_u16(buf, pos)
+    count, pos = read_u16(buf, pos)
     bets = []
     for _ in range(count):
-        bet, pos = _decode_one_bet(buf, pos)
+        bet, pos = decode_one_bet(buf, pos)
         bets.append(bet)
     return bets
 
@@ -74,7 +83,7 @@ def read_done(sock: socket.socket) -> int:
         raise ValueError("bad DONE")
     buf = memoryview(f)
     _, pos = 4, 4
-    agency_id, pos = _read_u32(buf, pos)
+    agency_id, pos = read_u32(buf, pos)
     return int(agency_id)
 
 def send_done(sock: socket.socket, agency_id: int):
@@ -90,7 +99,7 @@ def read_query_winners(sock: socket.socket) -> int:
         raise ValueError("bad QWIN")
     buf = memoryview(f)
     _, pos = 4, 4
-    agency_id, pos = _read_u32(buf, pos)
+    agency_id, pos = read_u32(buf, pos)
     return int(agency_id)
 
 def send_query_winners(sock: socket.socket, agency_id: int):
@@ -113,7 +122,7 @@ def read_winners(sock: socket.socket) -> list[str]:
         raise ValueError("bad WINS")
     buf = memoryview(f)
     pos = 4
-    count, pos = _read_u16(buf, pos)
+    count, pos = read_u16(buf, pos)
     out = []
     for _ in range(count):
         s, pos = _read_str(buf, pos)
