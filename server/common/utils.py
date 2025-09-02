@@ -1,5 +1,7 @@
 import csv
 import datetime
+import os
+import fcntl
 
 
 """ Bets storage location. """
@@ -29,22 +31,37 @@ def has_won(bet: Bet) -> bool:
 
 """
 Persist the information of each bet in the STORAGE_FILEPATH file.
-Not thread-safe/process-safe.
+Uses an exclusive fcntl lock to serialize writers.
 """
 def store_bets(bets: list[Bet]) -> None:
-    with open(STORAGE_FILEPATH, 'a+') as file:
-        writer = csv.writer(file, quoting=csv.QUOTE_MINIMAL)
-        for bet in bets:
-            writer.writerow([bet.agency, bet.first_name, bet.last_name,
-                             bet.document, bet.birthdate, bet.number])
+    with open(STORAGE_FILEPATH, 'a+', buffering=1) as file:
+        # Exclusive lock for writing
+        fcntl.flock(file, fcntl.LOCK_EX)
+        try:
+            writer = csv.writer(file, quoting=csv.QUOTE_MINIMAL)
+            for bet in bets:
+                writer.writerow([bet.agency, bet.first_name, bet.last_name,
+                                 bet.document, bet.birthdate, bet.number])
+            file.flush()
+            try:
+                os.fsync(file.fileno())
+            except OSError:
+                pass
+        finally:
+            fcntl.flock(file, fcntl.LOCK_UN)
 
 """
 Loads the information all the bets in the STORAGE_FILEPATH file.
-Not thread-safe/process-safe.
+Load all bets with a shared lock to avoid partial reads.
 """
 def load_bets() -> list[Bet]:
     with open(STORAGE_FILEPATH, 'r') as file:
-        reader = csv.reader(file, quoting=csv.QUOTE_MINIMAL)
-        for row in reader:
-            yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
-
+        # Shared lock for reading while preventing writers
+        fcntl.flock(file, fcntl.LOCK_SH)
+        try:
+            reader = csv.reader(file, quoting=csv.QUOTE_MINIMAL)
+            rows = list(reader)
+        finally:
+            fcntl.flock(file, fcntl.LOCK_UN)
+    for row in rows:
+        yield Bet(row[0], row[1], row[2], row[3], row[4], row[5])
