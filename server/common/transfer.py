@@ -19,9 +19,21 @@ def read_frame(sock: socket.socket) -> bytes:
     length = int.from_bytes(header, byteorder="big", signed=False)
     return _recv_exact(sock, length) if length else b""
 
+def _send_all(sock: socket.socket, data: bytes) -> None:
+    view = memoryview(data)
+    sent_total = 0
+    size = len(view)
+    while sent_total < size:
+        n = sock.send(view[sent_total:])
+        if n == 0:
+            raise OSError("socket closed during send")
+        sent_total += n
+
 def write_frame(sock: socket.socket, payload: bytes):
     header = len(payload).to_bytes(4, byteorder="big", signed=False)
-    sock.sendall(header + payload)
+    _send_all(sock, header)
+    if payload:
+        _send_all(sock, payload)
 
 # --------- decode helpers ----------
 def _read_u16(buf, pos):
