@@ -25,14 +25,28 @@ func atoiSafe(s string) int {
 	return n
 }
 
+// writeFull writes the entire buffer to the connection, handling short writes.
+func writeFull(conn net.Conn, b []byte) error {
+	for len(b) > 0 {
+		n, err := conn.Write(b)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+		b = b[n:]
+	}
+	return nil
+}
+
 func writeFrame(conn net.Conn, payload []byte) error {
 	var hdr [4]byte
 	binary.BigEndian.PutUint32(hdr[:], uint32(len(payload)))
-	if _, err := conn.Write(hdr[:]); err != nil {
+	if err := writeFull(conn, hdr[:]); err != nil {
 		return err
 	}
-	_, err := conn.Write(payload)
-	return err
+	return writeFull(conn, payload)
 }
 
 func readN(r io.Reader, n int) ([]byte, error) {
