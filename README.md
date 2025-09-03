@@ -23,7 +23,7 @@ Luego se puede levantar con el Makefile:
 
 ### Ejercicio N°2:
 
-Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera reconstruír las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida por fuera de la imagen (hint: `docker volumes`). La ejecución es idéntica al ejercico anterior.
+Para este ejercicio se montó los archivos de configuración para el servidor y cada cliente respectivamente. Luego, se eliminó las variables de entorno generadas para el .yml para que no pisen a lo seteado en la configuración. Finalmente, se eliminó copiar el archivo de configuración en el Dockerfile. No es necesario ya que se monta como volumen.
 
 ### Ejercicio N°3:
 
