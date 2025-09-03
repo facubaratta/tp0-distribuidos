@@ -9,6 +9,18 @@ Facundo Baratta - 104886
 Como es sugerido en la solución, `generar-compose.sh` llama a un script de python (creativamente llamado) `generar-compose.py`. El script de bash recibe dos parametros: nombre del archivo de entrada, y de salida. Estos son pasados al script de python. Si la cantidad de variables de entrada es distinta de dos, se muestra ayuda de uso.
 El script de python genera un archivo docker-compose con estructura similar al suministrado en el repositorio inicialmente.
 
+Para ejecutarlo:
+
+`./generar-compose.sh <archivo_de_salida> N`
+
+Ejemplo:
+
+`./generar-compose.sh <archivo_de_salida> N`
+
+Luego se puede levantar con el Makefile:
+
+`make docker-compose-up`
+
 ### Ejercicio N°2:
 
 Para este ejercicio se montó los archivos de configuración para el servidor y cada cliente respectivamente. Luego, se eliminó las variables de entorno generadas para el .yml para que no pisen a lo seteado en la configuración. Finalmente, se eliminó copiar el archivo de configuración en el Dockerfile. No es necesario ya que se monta como volumen.
@@ -17,10 +29,15 @@ Para este ejercicio se montó los archivos de configuración para el servidor y 
 
 El creado script primero genera un string con timestamp único. Luego levanta un contenedor efimero ligero, el cual se conecta a la red de Docker. Con nc se abre un socket TCP al cual se le manda el string, el cual se espera que sea haga un echo idéntico, validando que la red esta saludable.
 
+Luego de levantar los containers y la red como se explica en el ej1, se puede ejecutar el healthcheck minimalista: `./validar-echo-server.sh`
+
 ### Ejercicio N°4:
 
-Para el cliente decidí implementar el código de manejo de señales en `main.go`. Aquí se crea un canal de señales que se subcribe a la señal SIGTERM. Este canal se lo paso como variable la función `StartClientLoop`, la cual, si hay SIGTERM, crea el log correspondiente y sale de la función, volviendo a main, y finalmente cierra el programa gracefully naturalmente. En ramas posteriores utilizaré una forma más idiomática de corroborar si hay una señal en el canal (mi primera vez programando en Go).
-Similarmente para el servidor en `main.py` se subscribe la señal SIGTERM a una función `graceful_shutdown`. Esta llama a la correspondiente función de mismo nombre del servidor (variable global) - si es que existe, sino corta ejecución del programa. En `server.py` la función `graceful_shutdown` cambia el flag que permite seguir recibiendo solicitudes entrantes, e intenta cerrar el socket del servidor y todas las conexiones con los clientes, manejando y logeando los errores que puedan ocurrir.
+Para el cliente decidí implementar el código de manejo de señales en main.go. Aquí se crea un canal de señales que se subcribe a la señal SIGTERM. Este canal se lo paso como variable la función StartClientLoop, la cual, si hay SIGTERM, crea el log correspondiente y sale de la función, volviendo a main, y finalmente cierra el programa gracefully naturalmente. En ramas posteriores utilizaré una forma más idiomática de corroborar si hay una señal en el canal (mi primera vez programando en Go). Similarmente para el servidor en main.py se subscribe la señal SIGTERM a una función graceful_shutdown. Esta llama a la correspondiente función de mismo nombre del servidor (variable global) - si es que existe, sino corta ejecución del programa. En server.py la función graceful_shutdown cambia el flag que permite seguir recibiendo solicitudes entrantes, e intenta cerrar el socket del servidor y todas las conexiones con los clientes, manejando y logeando los errores que puedan ocurrir.
+
+Luego de levantar los containers se puede enviar la señal SIGTERM de la siguiente manera:
+`docker compose -f <filename> stop -t <time>`
+Donde `filename` es el nombre del docker compose (no usamos el default sino `docker-compose-dev.yaml`) y `time` los segundos de gracia antes de enviar `SIGKILL`
 
 ## Parte 2: Repaso de Comunicaciones
 
@@ -53,6 +70,8 @@ Y el del ACK:
 [ok: 1 byte 0|1]
 [si ok==0 => error: u16 len + bytes]
 ```
+
+Se levanta como en el primer ejercico
 
 ### Ejercicio N°6:
 
