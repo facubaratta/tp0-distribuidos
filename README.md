@@ -35,6 +35,10 @@ Luego de levantar los containers y la red como se explica en el ej1, se puede ej
 
 Para el cliente decidí implementar el código de manejo de señales en main.go. Aquí se crea un canal de señales que se subcribe a la señal SIGTERM. Este canal se lo paso como variable la función StartClientLoop, la cual, si hay SIGTERM, crea el log correspondiente y sale de la función, volviendo a main, y finalmente cierra el programa gracefully naturalmente. En ramas posteriores utilizaré una forma más idiomática de corroborar si hay una señal en el canal (mi primera vez programando en Go). Similarmente para el servidor en main.py se subscribe la señal SIGTERM a una función graceful_shutdown. Esta llama a la correspondiente función de mismo nombre del servidor (variable global) - si es que existe, sino corta ejecución del programa. En server.py la función graceful_shutdown cambia el flag que permite seguir recibiendo solicitudes entrantes, e intenta cerrar el socket del servidor y todas las conexiones con los clientes, manejando y logeando los errores que puedan ocurrir.
 
+Luego de levantar los containers se puede enviar la señal SIGTERM de la siguiente manera:
+`docker compose -f <filename> stop -t <time>`
+Donde `filename` es el nombre del docker compose (no usamos el default sino `docker-compose-dev.yaml`) y `time` los segundos de gracia antes de enviar `SIGKILL`
+
 ## Parte 2: Repaso de Comunicaciones
 
 Las secciones de repaso del trabajo práctico plantean un caso de uso denominado **Lotería Nacional**. Para la resolución de las mismas deberá utilizarse como base el código fuente provisto en la primera parte, con las modificaciones agregadas en el ejercicio 4.
