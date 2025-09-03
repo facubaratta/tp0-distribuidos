@@ -23,25 +23,17 @@ Luego se puede levantar con el Makefile:
 
 ### Ejercicio N°2:
 
-Modificar el cliente y el servidor para lograr que realizar cambios en el archivo de configuración no requiera reconstruír las imágenes de Docker para que los mismos sean efectivos. La configuración a través del archivo correspondiente (`config.ini` y `config.yaml`, dependiendo de la aplicación) debe ser inyectada en el container y persistida por fuera de la imagen (hint: `docker volumes`). La ejecución es idéntica al ejercico anterior.
+Para este ejercicio se montó los archivos de configuración para el servidor y cada cliente respectivamente. Luego, se eliminó las variables de entorno generadas para el .yml para que no pisen a lo seteado en la configuración. Finalmente, se eliminó copiar el archivo de configuración en el Dockerfile. No es necesario ya que se monta como volumen.
 
 ### Ejercicio N°3:
 
-Crear un script de bash `validar-echo-server.sh` que permita verificar el correcto funcionamiento del servidor utilizando el comando `netcat` para interactuar con el mismo. Dado que el servidor es un echo server, se debe enviar un mensaje al servidor y esperar recibir el mismo mensaje enviado.
+El creado script primero genera un string con timestamp único. Luego levanta un contenedor efimero ligero, el cual se conecta a la red de Docker. Con nc se abre un socket TCP al cual se le manda el string, el cual se espera que sea haga un echo idéntico, validando que la red esta saludable.
 
-En caso de que la validación sea exitosa imprimir: `action: test_echo_server | result: success`, de lo contrario imprimir:`action: test_echo_server | result: fail`.
-
-El script deberá ubicarse en la raíz del proyecto. Netcat no debe ser instalado en la máquina _host_ y no se pueden exponer puertos del servidor para realizar la comunicación (hint: `docker network`).
-
-Luego de levantar los containers como se explica en el ejercicio 1, se corre el script de healthcheck minimalista: `./validar-echo-server.sh`
+Luego de levantar los containers y la red como se explica en el ej1, se puede ejecutar el healthcheck minimalista: `./validar-echo-server.sh`
 
 ### Ejercicio N°4:
 
-Modificar servidor y cliente para que ambos sistemas terminen de forma _graceful_ al recibir la signal SIGTERM. Terminar la aplicación de forma _graceful_ implica que todos los _file descriptors_ (entre los que se encuentran archivos, sockets, threads y procesos) deben cerrarse correctamente antes que el thread de la aplicación principal muera. Loguear mensajes en el cierre de cada recurso (hint: Verificar que hace el flag `-t` utilizado en el comando `docker compose down`).
-
-Una forma de mandar la señal SIGTERM a los containers es:
-`docker compose -f <filename> stop -t <n>`
-Donde filename es `docker-compose-dev.yaml` si se llama así, y n es la cantidad de segundos antes de llamar SIGKILL. 5 segundos esta bien.
+Para el cliente decidí implementar el código de manejo de señales en main.go. Aquí se crea un canal de señales que se subcribe a la señal SIGTERM. Este canal se lo paso como variable la función StartClientLoop, la cual, si hay SIGTERM, crea el log correspondiente y sale de la función, volviendo a main, y finalmente cierra el programa gracefully naturalmente. En ramas posteriores utilizaré una forma más idiomática de corroborar si hay una señal en el canal (mi primera vez programando en Go). Similarmente para el servidor en main.py se subscribe la señal SIGTERM a una función graceful_shutdown. Esta llama a la correspondiente función de mismo nombre del servidor (variable global) - si es que existe, sino corta ejecución del programa. En server.py la función graceful_shutdown cambia el flag que permite seguir recibiendo solicitudes entrantes, e intenta cerrar el socket del servidor y todas las conexiones con los clientes, manejando y logeando los errores que puedan ocurrir.
 
 ## Parte 2: Repaso de Comunicaciones
 
